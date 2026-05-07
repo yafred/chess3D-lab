@@ -3,10 +3,11 @@
 import * as THREE from 'three';
 import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
 import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
+
 import { fenToScene } from './fen';
 import { createPieceHoverController } from './hover';
-import { setupPieceInteraction } from './pieceInteraction';
 import { setupLichessInteraction } from './lichess';
+import { setupPieceInteraction } from './pieceInteraction';
 
 // Commands from the browser console for testing
 declare global {
@@ -18,7 +19,7 @@ declare global {
 }
 window.displayFen = displayFenInScene;
 window.setFov = setFov;
-window.movePiece = (uci) => {
+window.movePiece = uci => {
   const from = uci.slice(0, 2);
   const to = uci.slice(-2);
   return pieceInteraction.moveProgrammaticallyBySquare(from, to);
@@ -60,20 +61,20 @@ controls.enableDamping = true;
 controls.dampingFactor = 0.05;
 
 // Lighting
-const ambientLight = new THREE.HemisphereLight(0xffffff, 0x444444, 2); 
-scene.add( ambientLight );
+const ambientLight = new THREE.HemisphereLight(0xffffff, 0x444444, 2);
+scene.add(ambientLight);
 
-const light = new THREE.DirectionalLight(0xffffff, .5);
+const light = new THREE.DirectionalLight(0xffffff, 0.5);
 light.position.set(0, 1, 1);
 light.target.position.set(0, 0, 0);
 scene.add(light);
-const light2 = new THREE.DirectionalLight(0xffffff, .5);
+const light2 = new THREE.DirectionalLight(0xffffff, 0.5);
 light2.position.set(0, 1, -1);
 light2.target.position.set(0, 0, 0);
 scene.add(light2);
 
 // Resize event
-window.addEventListener("resize", () => {
+window.addEventListener('resize', () => {
   const { width, height } = getSceneRootSize();
   camera.aspect = width / height;
   camera.updateProjectionMatrix();
@@ -94,31 +95,37 @@ const pieceInteraction = setupPieceInteraction({
 });
 
 const lichessInteraction = setupLichessInteraction({
-  onServerMove: (uci) => {
+  onServerMove: uci => {
     console.log('Server move:', uci);
     pieceInteraction.moveProgrammaticallyBySquare(uci.slice(0, 2), uci.slice(-2));
   },
   onGameStart: () => {
     console.log('Game started on Lichess. Resetting board.');
     displayFenInScene(defaultFen);
-  } 
+  },
 });
 
-
-pieceInteraction.setMoveAttemptCallback ( (uci) => {
+pieceInteraction.setMoveAttemptCallback(uci => {
   console.log('User move attempt:', uci);
   return lichessInteraction.userMove(uci);
 });
 
 // Load the scene and pieces
-loader.load(sceneAssetUrl, (gltf) => {
+loader.load(sceneAssetUrl, gltf => {
   scene.add(gltf.scene);
   gltf.scene.scale.set(1, 1, 1);
-  scene.traverse((obj) => {
-    if (obj instanceof THREE.Mesh && ['King', 'Queen', 'Rook', 'Bishop', 'Knight', 'Pawn'].includes(obj.name)) {
-      obj.visible = false; 
+  scene.traverse(obj => {
+    if (
+      obj instanceof THREE.Mesh &&
+      ['King', 'Queen', 'Rook', 'Bishop', 'Knight', 'Pawn'].includes(obj.name)
+    ) {
+      obj.visible = false;
       pieces.set(obj.name, obj);
-      if (obj.material && !Array.isArray(obj.material) && ['white piece', 'black piece'].includes(obj.material.name)) {
+      if (
+        obj.material &&
+        !Array.isArray(obj.material) &&
+        ['white piece', 'black piece'].includes(obj.material.name)
+      ) {
         materials.set(obj.material.name, obj.material);
       }
     }
@@ -137,7 +144,6 @@ function animate() {
   renderer.render(scene, camera);
 }
 animate();
-
 
 // Utils
 function displayFenInScene(fen: string) {
@@ -162,4 +168,3 @@ function getSceneRootSize() {
     height: sceneRoot.clientHeight || window.innerHeight,
   };
 }
-

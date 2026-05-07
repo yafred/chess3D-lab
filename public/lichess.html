@@ -1,191 +1,189 @@
 <!doctype html>
 <html>
+  <head>
+    <meta charset="utf-8" />
+    <title>Lichess board client</title>
+  </head>
 
-<head>
-  <meta charset="utf-8" />
-  <title>Lichess board client</title>
-</head>
+  <body>
+    <button id="login">Connect to Lichess</button>
+    <button id="logout">Disconnect from Lichess</button>
 
-<body>
-  <button id="login">Connect to Lichess</button>
-  <button id="logout">Disconnect from Lichess</button>
+    <button id="playing">Get ongoing games</button>
+    <button id="connect">Connect to game stream</button>
+    <button id="disconnect">Disconnect from game stream</button>
+    <input id="move" placeholder="e2e4" />
+    <button id="send">Send move</button>
 
-  <button id="playing">Get ongoing games</button>
-  <button id="connect">Connect to game stream</button>
-  <button id="disconnect">Disconnect from game stream</button>
-  <input id="move" placeholder="e2e4" />
-  <button id="send">Send move</button>
+    <pre id="log"></pre>
 
-  <pre id="log"></pre>
+    <script>
+      const CLIENT_ID = 'chess3D';
+      const REDIRECT_URI = location.origin + location.pathname;
+      const SCOPES = 'board:play';
+      const HOST = 'https://lichess.org';
+      //const HOST = "http://localhost:9663";
 
-  <script>
-    const CLIENT_ID = "chess3D";
-    const REDIRECT_URI = location.origin + location.pathname;
-    const SCOPES = "board:play";
-    const HOST = "https://lichess.org";
-    //const HOST = "http://localhost:9663";
+      const log = msg => {
+        document.querySelector('#log').textContent += msg + '\n';
+      };
 
-    const log = (msg) => {
-      document.querySelector("#log").textContent += msg + "\n";
-    };
+      function randomString(len = 64) {
+        const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789-._~';
+        let s = '';
+        crypto.getRandomValues(new Uint8Array(len)).forEach(v => (s += chars[v % chars.length]));
+        return s;
+      }
 
-    function randomString(len = 64) {
-      const chars = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789-._~";
-      let s = "";
-      crypto.getRandomValues(new Uint8Array(len)).forEach(v => s += chars[v % chars.length]);
-      return s;
-    }
+      async function sha256(baseString) {
+        const data = new TextEncoder().encode(baseString);
+        const digest = await crypto.subtle.digest('SHA-256', data);
+        return btoa(String.fromCharCode(...new Uint8Array(digest)))
+          .replace(/\+/g, '-')
+          .replace(/\//g, '_')
+          .replace(/=+$/, '');
+      }
 
-    async function sha256(baseString) {
-      const data = new TextEncoder().encode(baseString);
-      const digest = await crypto.subtle.digest("SHA-256", data);
-      return btoa(String.fromCharCode(...new Uint8Array(digest)))
-        .replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/, "");
-    }
+      async function login() {
+        const verifier = randomString(96);
+        const challenge = await sha256(verifier);
+        localStorage.setItem('pkce_verifier', verifier);
 
-    async function login() {
-      const verifier = randomString(96);
-      const challenge = await sha256(verifier);
-      localStorage.setItem("pkce_verifier", verifier);
+        const url = new URL(`${HOST}/oauth`);
+        url.searchParams.set('response_type', 'code');
+        url.searchParams.set('client_id', CLIENT_ID);
+        url.searchParams.set('redirect_uri', REDIRECT_URI);
+        url.searchParams.set('code_challenge', challenge);
+        url.searchParams.set('code_challenge_method', 'S256');
+        url.searchParams.set('scope', SCOPES);
 
-      const url = new URL(`${HOST}/oauth`);
-      url.searchParams.set("response_type", "code");
-      url.searchParams.set("client_id", CLIENT_ID);
-      url.searchParams.set("redirect_uri", REDIRECT_URI);
-      url.searchParams.set("code_challenge", challenge);
-      url.searchParams.set("code_challenge_method", "S256");
-      url.searchParams.set("scope", SCOPES);
+        location.href = url.toString();
+      }
 
-      location.href = url.toString();
-    }
+      async function exchangeCodeForToken(code) {
+        const verifier = localStorage.getItem('pkce_verifier');
+        const form = new URLSearchParams({
+          grant_type: 'authorization_code',
+          client_id: CLIENT_ID,
+          code,
+          code_verifier: verifier,
+          redirect_uri: REDIRECT_URI,
+        });
 
-    async function exchangeCodeForToken(code) {
-      const verifier = localStorage.getItem("pkce_verifier");
-      const form = new URLSearchParams({
-        grant_type: "authorization_code",
-        client_id: CLIENT_ID,
-        code,
-        code_verifier: verifier,
-        redirect_uri: REDIRECT_URI
-      });
+        const res = await fetch(`${HOST}/api/token`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+          body: form,
+        });
 
-      const res = await fetch(`${HOST}/api/token`, {
-        method: "POST",
-        headers: { "Content-Type": "application/x-www-form-urlencoded" },
-        body: form
-      });
+        const json = await res.json();
+        localStorage.setItem('lichess_token', json.access_token);
+        log('Connected to Lichess.');
+      }
 
-      const json = await res.json();
-      localStorage.setItem("lichess_token", json.access_token);
-      log("Connected to Lichess.");
-    }
+      async function connectGameStream(gameId) {
+        localStorage.setItem('lichess_game', gameId);
+        const token = localStorage.getItem('lichess_token');
+        const res = await fetch(`${HOST}/api/board/game/stream/${gameId}`, {
+          headers: { Authorization: `Bearer ${token}` },
+        });
 
-    async function connectGameStream(gameId) {
-      localStorage.setItem("lichess_game", gameId);
-      const token = localStorage.getItem("lichess_token");
-      const res = await fetch(`${HOST}/api/board/game/stream/${gameId}`, {
-        headers: { Authorization: `Bearer ${token}` }
-      });
+        const reader = res.body.getReader();
+        const decoder = new TextDecoder();
+        let buf = '';
 
-      const reader = res.body.getReader();
-      const decoder = new TextDecoder();
-      let buf = "";
+        while (true) {
+          const { value, done } = await reader.read();
+          if (done) break;
+          buf += decoder.decode(value, { stream: true });
 
-      while (true) {
-        const { value, done } = await reader.read();
-        if (done) break;
-        buf += decoder.decode(value, { stream: true });
+          const lines = buf.split('\n');
+          buf = lines.pop();
 
-        const lines = buf.split("\n");
-        buf = lines.pop();
-
-        for (const line of lines) {
-          if (!line.trim()) continue;
-          try {
-            const msg = JSON.parse(line);
-            log(JSON.stringify(msg));
-          } catch { }
+          for (const line of lines) {
+            if (!line.trim()) continue;
+            try {
+              const msg = JSON.parse(line);
+              log(JSON.stringify(msg));
+            } catch {}
+          }
         }
       }
-    }
 
-    async function sendMove(gameId, move) {
-      const token = localStorage.getItem("lichess_token");
-      const res = await fetch(`${HOST}/api/board/game/${gameId}/move/${move}`, {
-        method: "POST",
-        headers: { Authorization: `Bearer ${token}` }
-      });
-      log(`Move sent: ${move}, status=${res.status}`);
-    }
-
-
-    async function getOngoingGames() {
-      const token = localStorage.getItem("lichess_token");
-
-      const accountRes = await fetch(`${HOST}/api/account`, {
-        headers: { Authorization: `Bearer ${token}` }
-      });
-      const accountJson = await accountRes.json();
-      log(`Logged in as ${accountJson.username}`);
-      localStorage.setItem("lichess_username", accountJson.username);
-
-      const res = await fetch(`${HOST}/api/account/playing`, {
-        headers: { Authorization: `Bearer ${token}` }
-      });
-      const json = await res.json();
-      log(json.nowPlaying.map(g => g.gameId + " (as " + g.color + ")" + " against " + g.opponent.username).join("\n"));
-    }
-
-
-
-
-    // Set up event listeners
-    document.querySelector("#login").onclick = login;
-    document.querySelector("#logout").onclick = () => {
-      localStorage.removeItem("lichess_token");
-      localStorage.removeItem("lichess_game");
-      localStorage.removeItem("pkce_verifier");
-      localStorage.removeItem("lichess_username");
-      log("Disconnected from Lichess.");
-    };
-    document.querySelector("#connect").onclick = () => {
-      const gameId = prompt("Game ID?");
-      connectGameStream(gameId);
-    };
-    document.querySelector("#send").onclick = () => {
-      const gameId = localStorage.getItem("lichess_game");
-      if (!gameId) {
-        log("No game stream connected.");
-        return;
+      async function sendMove(gameId, move) {
+        const token = localStorage.getItem('lichess_token');
+        const res = await fetch(`${HOST}/api/board/game/${gameId}/move/${move}`, {
+          method: 'POST',
+          headers: { Authorization: `Bearer ${token}` },
+        });
+        log(`Move sent: ${move}, status=${res.status}`);
       }
-      const move = document.querySelector("#move").value;
-      sendMove(gameId, move);
-    };
-    document.querySelector("#playing").onclick = () => {
-      getOngoingGames();
-    };
-    document.querySelector("#disconnect").onclick = () => {
-      localStorage.removeItem("lichess_game");
-      log("Disconnected from game stream.");
-    };
 
+      async function getOngoingGames() {
+        const token = localStorage.getItem('lichess_token');
 
+        const accountRes = await fetch(`${HOST}/api/account`, {
+          headers: { Authorization: `Bearer ${token}` },
+        });
+        const accountJson = await accountRes.json();
+        log(`Logged in as ${accountJson.username}`);
+        localStorage.setItem('lichess_username', accountJson.username);
 
-    const params = new URLSearchParams(location.search);
-    const code = params.get("code");
-
-    if (localStorage.getItem("lichess_token")) {
-      log("Connected to Lichess.");
-    }
-
-    if (code) {
-      // Remove the code from the URL to avoid confusion on reload
-      history.replaceState({}, document.title, location.pathname);
-      if (!localStorage.getItem("lichess_token")) {
-        exchangeCodeForToken(code);
+        const res = await fetch(`${HOST}/api/account/playing`, {
+          headers: { Authorization: `Bearer ${token}` },
+        });
+        const json = await res.json();
+        log(
+          json.nowPlaying
+            .map(g => g.gameId + ' (as ' + g.color + ')' + ' against ' + g.opponent.username)
+            .join('\n'),
+        );
       }
-    }
-  </script>
-</body>
 
+      // Set up event listeners
+      document.querySelector('#login').onclick = login;
+      document.querySelector('#logout').onclick = () => {
+        localStorage.removeItem('lichess_token');
+        localStorage.removeItem('lichess_game');
+        localStorage.removeItem('pkce_verifier');
+        localStorage.removeItem('lichess_username');
+        log('Disconnected from Lichess.');
+      };
+      document.querySelector('#connect').onclick = () => {
+        const gameId = prompt('Game ID?');
+        connectGameStream(gameId);
+      };
+      document.querySelector('#send').onclick = () => {
+        const gameId = localStorage.getItem('lichess_game');
+        if (!gameId) {
+          log('No game stream connected.');
+          return;
+        }
+        const move = document.querySelector('#move').value;
+        sendMove(gameId, move);
+      };
+      document.querySelector('#playing').onclick = () => {
+        getOngoingGames();
+      };
+      document.querySelector('#disconnect').onclick = () => {
+        localStorage.removeItem('lichess_game');
+        log('Disconnected from game stream.');
+      };
+
+      const params = new URLSearchParams(location.search);
+      const code = params.get('code');
+
+      if (localStorage.getItem('lichess_token')) {
+        log('Connected to Lichess.');
+      }
+
+      if (code) {
+        // Remove the code from the URL to avoid confusion on reload
+        history.replaceState({}, document.title, location.pathname);
+        if (!localStorage.getItem('lichess_token')) {
+          exchangeCodeForToken(code);
+        }
+      }
+    </script>
+  </body>
 </html>
