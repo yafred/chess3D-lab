@@ -9,19 +9,19 @@ You can see current state [here](https://yafred.github.io/chess3D/)
 ## Installation
 
 ```sh
-npm install
+pnpm install
 ```
 
 ## Local Development
 
 ```sh
-npm run dev
+pnpm dev
 ```
 
 ## Production Build
 
 ```sh
-npm run build
+pnpm build
 ```
 
 The production build is written to `dist/` and uses relative asset paths so it can be hosted on GitHub Pages.
