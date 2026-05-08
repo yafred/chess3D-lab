@@ -6,7 +6,6 @@ import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
 
 import { fenToScene } from './fen';
 import { createPieceHoverController } from './hover';
-import { setupLichessInteraction } from './lichess';
 import { setupPieceInteraction } from './pieceInteraction';
 
 // Commands from the browser console for testing
@@ -92,22 +91,6 @@ const pieceInteraction = setupPieceInteraction({
   renderer,
   controls,
   hoverController,
-});
-
-const lichessInteraction = setupLichessInteraction({
-  onServerMove: uci => {
-    console.log('Server move:', uci);
-    pieceInteraction.moveProgrammaticallyBySquare(uci.slice(0, 2), uci.slice(-2));
-  },
-  onGameStart: () => {
-    console.log('Game started on Lichess. Resetting board.');
-    displayFenInScene(defaultFen);
-  },
-});
-
-pieceInteraction.setMoveAttemptCallback(uci => {
-  console.log('User move attempt:', uci);
-  return lichessInteraction.userMove(uci);
 });
 
 // Load the scene and pieces
