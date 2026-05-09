@@ -25,7 +25,6 @@ const sceneRootElement: HTMLDivElement = sceneRoot;
 
 const sceneAssetUrl = `${import.meta.env.BASE_URL}scene.glb`;
 const defaultFen = 'rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR';
-let pendingFen: string | null = null;
 
 // Camera
 const { width: initialWidth, height: initialHeight } = getSceneRootSize();
@@ -99,8 +98,7 @@ loader.load(sceneAssetUrl, gltf => {
     }
   });
 
-  displayFenInScene(pendingFen ?? defaultFen);
-  pendingFen = null;
+  displayFenInScene(defaultFen);
 });
 
 // Main loop
@@ -116,7 +114,6 @@ animate();
 // Utils
 function displayFenInScene(fen: string) {
   if (pieces.size === 0) {
-    pendingFen = fen;
     console.warn('Pieces are still loading. FEN queued and will be shown when ready.');
     return;
   }
