@@ -1,7 +1,7 @@
-## [Chess3D](https://yafred.github.io/chess3D/)
-Chess3D is my lab for displaying 3D chessboard on a web page using [Three.js](https://threejs.org/).
+## [Chess3D-lab](https://yafred.github.io/chess3D-lab/)
+3D chessboard using [Three.js](https://threejs.org/).
 
-<img width="1157" height="1030" alt="Capture d&#39;écran 2026-03-30 131439" src="https://github.com/user-attachments/assets/2ad795af-5f5e-4e6e-8332-a1c4f924b8e4" />
+<img width="1157" height="1030" alt="Screenshot of a chess set 3D model" src="https://github.com/user-attachments/assets/2ad795af-5f5e-4e6e-8332-a1c4f924b8e4" />
 
 
 ## Installation
