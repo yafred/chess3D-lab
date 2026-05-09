@@ -8,22 +8,6 @@ import { fenToScene } from './fen';
 import { createPieceHoverController } from './hover';
 import { setupPieceInteraction } from './pieceInteraction';
 
-// Commands from the browser console for testing
-declare global {
-  interface Window {
-    displayFen: (fen: string) => void;
-    setFov: (fov: number) => void;
-    movePiece: (uci: string) => boolean;
-  }
-}
-window.displayFen = displayFenInScene;
-window.setFov = setFov;
-window.movePiece = uci => {
-  const from = uci.slice(0, 2);
-  const to = uci.slice(-2);
-  return pieceInteraction.moveProgrammaticallyBySquare(from, to);
-};
-
 // Scene setup
 const scene = new THREE.Scene();
 scene.visible = false;
@@ -37,6 +21,7 @@ const sceneRoot = document.getElementById('chess3D-container');
 if (!(sceneRoot instanceof HTMLDivElement)) {
   throw new Error('Missing chess3D-container container.');
 }
+const sceneRootElement: HTMLDivElement = sceneRoot;
 
 const sceneAssetUrl = `${import.meta.env.BASE_URL}scene.glb`;
 const defaultFen = 'rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR';
@@ -52,7 +37,7 @@ camera.updateProjectionMatrix();
 // Renderer
 const renderer = new THREE.WebGLRenderer({ antialias: true });
 renderer.setSize(initialWidth, initialHeight);
-sceneRoot.appendChild(renderer.domElement);
+sceneRootElement.appendChild(renderer.domElement);
 
 // Controls
 const controls = new OrbitControls(camera, renderer.domElement);
@@ -82,10 +67,10 @@ window.addEventListener('resize', () => {
 
 // Set up piece hover and interaction
 const hoverController = createPieceHoverController(scene, camera, renderer.domElement);
-sceneRoot.addEventListener('pointermove', hoverController.updateFromPointerEvent);
+sceneRootElement.addEventListener('pointermove', hoverController.updateFromPointerEvent);
 
 // Set up interactions
-const pieceInteraction = setupPieceInteraction({
+setupPieceInteraction({
   scene,
   camera,
   renderer,
@@ -140,14 +125,9 @@ function displayFenInScene(fen: string) {
   scene.visible = true;
 }
 
-function setFov(fov: number) {
-  camera.fov = fov;
-  camera.updateProjectionMatrix();
-}
-
 function getSceneRootSize() {
   return {
-    width: sceneRoot.clientWidth || window.innerWidth,
-    height: sceneRoot.clientHeight || window.innerHeight,
+    width: sceneRootElement.clientWidth || window.innerWidth,
+    height: sceneRootElement.clientHeight || window.innerHeight,
   };
 }
