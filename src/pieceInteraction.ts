@@ -11,6 +11,8 @@ type DragState = {
   startPosition: THREE.Vector3;
   startClientX: number;
   startClientY: number;
+  pointerOffsetX: number;
+  pointerOffsetZ: number;
   hasMoved: boolean;
 };
 
@@ -317,8 +319,8 @@ export function setupPieceInteraction({
       return;
     }
 
-    dragState.piece.position.x = boardPoint.x;
-    dragState.piece.position.z = boardPoint.z;
+    dragState.piece.position.x = boardPoint.x + dragState.pointerOffsetX;
+    dragState.piece.position.z = boardPoint.z + dragState.pointerOffsetZ;
     dragState.piece.position.y = dragState.startPosition.y + 0.2;
   }
 
@@ -356,10 +358,14 @@ export function setupPieceInteraction({
     const hasBoardIntersection = pointerRaycaster.ray.intersectPlane(boardPlane, boardPoint) !== null;
 
     let dropApplied = false;
-    if (hasBoardIntersection && isWithinBoard(boardPoint.x, boardPoint.z)) {
-      const targetX = getSquareCoordinate(boardPoint.x);
-      const targetZ = getSquareCoordinate(boardPoint.z);
-      dropApplied = applyMoveOrCapture(piece, targetX, targetZ, startPosition.x, startPosition.z);
+    if (hasBoardIntersection) {
+      const dropX = boardPoint.x + dragState.pointerOffsetX;
+      const dropZ = boardPoint.z + dragState.pointerOffsetZ;
+      if (isWithinBoard(dropX, dropZ)) {
+        const targetX = getSquareCoordinate(dropX);
+        const targetZ = getSquareCoordinate(dropZ);
+        dropApplied = applyMoveOrCapture(piece, targetX, targetZ, startPosition.x, startPosition.z);
+      }
     }
 
     if (!dropApplied) {
@@ -417,12 +423,20 @@ export function setupPieceInteraction({
       event.preventDefault();
       event.stopPropagation();
 
+      updatePointerNdc(event);
+      pointerRaycaster.setFromCamera(pointerNdc, camera);
+      const hasBoardIntersection = pointerRaycaster.ray.intersectPlane(boardPlane, boardPoint) !== null;
+      const pointerOffsetX = hasBoardIntersection ? piece.position.x - boardPoint.x : 0;
+      const pointerOffsetZ = hasBoardIntersection ? piece.position.z - boardPoint.z : 0;
+
       dragState = {
         piece,
         pointerId: event.pointerId,
         startPosition: piece.position.clone(),
         startClientX: event.clientX,
         startClientY: event.clientY,
+        pointerOffsetX,
+        pointerOffsetZ,
         hasMoved: false,
       };
       controls.enabled = false;
